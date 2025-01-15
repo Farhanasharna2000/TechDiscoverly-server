@@ -4,7 +4,7 @@ const cors = require('cors')
 const { MongoClient, ServerApiVersion, ObjectId} = require('mongodb')
 const jwt = require('jsonwebtoken')
 const morgan = require('morgan')
-
+const stripe = require('stripe')(process.env.PAYMENT_SECRET_KEY);
 const port = process.env.PORT || 2000
 const app = express()
 // middleware
@@ -144,6 +144,52 @@ app.patch('/product/:id', async (req, res) => {
   const result = await productsCollection.deleteOne(query)
   res.send(result)
 })
+//payment
+app.post("/create-payment-intent", async (req, res) => {
+  try {
+    const { amount,email } = req.body;
+
+
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: amount * 100, // Convert to cents
+      currency: "usd",
+      
+      "payment_method_types": [
+        "card"
+      ],
+    });
+
+    res.send({ clientSecret: paymentIntent.client_secret });
+
+  } catch (error) {
+    res.status(500).send({ error: error.message });
+  }
+});
+// Update Subscription After Payment Success
+app.post("/update-subscription", async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).send({ error: "Email is required" });
+    }
+
+    // Update user's subscription status in the database
+    const result = await usersCollection.updateOne(
+      { email: email },
+      { $set: { isSubscribed: true } }
+    );
+
+    if (result.modifiedCount > 0) {
+      res.send({ success: true, message: "Subscription updated successfully" });
+    } else {
+      res.status(404).send({ error: "User not found" });
+    }
+  } catch (error) {
+    res.status(500).send({ error: error.message });
+  }
+});
+
     // Send a ping to confirm a successful connection
     await client.db('admin').command({ ping: 1 })
     console.log(
