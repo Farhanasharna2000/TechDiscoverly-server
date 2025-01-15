@@ -1,7 +1,7 @@
 require('dotenv').config()
 const express = require('express')
 const cors = require('cors')
-const { MongoClient, ServerApiVersion} = require('mongodb')
+const { MongoClient, ServerApiVersion, ObjectId} = require('mongodb')
 const jwt = require('jsonwebtoken')
 const morgan = require('morgan')
 
@@ -68,13 +68,18 @@ async function run() {
       }
       next()
     }
-  //get users data from db
+  //get users data based on email from db
 
-  app.get('/users', verifyToken, async (req, res) => {
-
-    const result = await usersCollection.find().toArray()
-    res.send(result)
-  })
+  app.get('/users/:email', verifyToken, async (req, res) => {
+    const email = req.params.email;
+    if (email !== req.decoded.email) {
+      return res.status(403).send({ message: 'forbidden access' });
+    }
+    const query = { email };
+    const user = await usersCollection.findOne(query);
+    res.send(user);
+  });
+  
     //post users collection in db
 
     app.post('/users', async (req, res) => {
@@ -100,6 +105,43 @@ app.get('/products/:email', verifyToken, async (req, res) => {
   const query = { 'ownerEmail': email }
   const result = await productsCollection.find(query).toArray()
 
+  res.send(result)
+})
+//update product data from db
+app.get('/product/:id', async (req, res) => {
+  const id = req.params.id;
+
+  const query = { _id: new ObjectId(id) }
+  const result = await productsCollection.findOne(query);
+
+
+  res.send(result);
+})
+app.patch('/product/:id', async (req, res) => {
+  const product = req.body;
+  const id = req.params.id;
+
+  const filter = { _id: new ObjectId(id) }
+  const updatedDoc = {
+    $set: {
+      productName: product.productName,
+      description: product.description,
+      link: product.link,
+      tags: product.tags,
+
+
+    }
+  }
+  const result = await productsCollection.updateOne(filter, updatedDoc);
+
+  res.send(result);
+})
+ // delete a product
+ app.delete('/products/:id', verifyToken, async (req, res) => {
+  const id = req.params.id
+  const query = { _id: new ObjectId(id) }
+
+  const result = await productsCollection.deleteOne(query)
   res.send(result)
 })
     // Send a ping to confirm a successful connection
