@@ -28,6 +28,8 @@ const client = new MongoClient(uri, {
 async function run() {
   try {
     const usersCollection = client.db('TechDiscoverly').collection('users')
+    const productsCollection = client.db('TechDiscoverly').collection('products')
+
   
 
 
@@ -66,7 +68,13 @@ async function run() {
       }
       next()
     }
- 
+  //get users data from db
+
+  app.get('/users', verifyToken, async (req, res) => {
+
+    const result = await usersCollection.find().toArray()
+    res.send(result)
+  })
     //post users collection in db
 
     app.post('/users', async (req, res) => {
@@ -79,6 +87,13 @@ async function run() {
       const result = await usersCollection.insertOne(user);
       res.send(result);
     });
+ //post product data in db
+
+ app.post('/product', verifyToken,  async (req, res) => {
+  const product = req.body;
+  const result = await productsCollection.insertOne({...product, timestamp: Date.now()} );
+  res.send(result);
+});
 
     // Send a ping to confirm a successful connection
     await client.db('admin').command({ ping: 1 })
