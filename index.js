@@ -94,7 +94,14 @@ async function run() {
   const result = await productsCollection.insertOne({...product, timestamp: Date.now()} );
   res.send(result);
 });
+// get all products for a specific user
+app.get('/products/:email', verifyToken, async (req, res) => {
+  const email = req.params.email
+  const query = { 'ownerEmail': email }
+  const result = await productsCollection.find(query).toArray()
 
+  res.send(result)
+})
     // Send a ping to confirm a successful connection
     await client.db('admin').command({ ping: 1 })
     console.log(
