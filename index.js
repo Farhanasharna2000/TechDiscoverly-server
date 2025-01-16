@@ -1,7 +1,7 @@
 require('dotenv').config()
 const express = require('express')
 const cors = require('cors')
-const { MongoClient, ServerApiVersion, ObjectId} = require('mongodb')
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb')
 const jwt = require('jsonwebtoken')
 const morgan = require('morgan')
 const stripe = require('stripe')(process.env.PAYMENT_SECRET_KEY);
@@ -30,16 +30,14 @@ async function run() {
     const usersCollection = client.db('TechDiscoverly').collection('users')
     const productsCollection = client.db('TechDiscoverly').collection('products')
 
-  
 
-
- //jwt related apis
- app.post('/jwt', async (req, res) => {
-  const user = req.body;
-  const token = jwt.sign(user, process.env.SECRET_KEY, { expiresIn: '365d' })
-  res.send({ token })
-})
-  //middlewares:
+    //jwt related apis
+    app.post('/jwt', async (req, res) => {
+      const user = req.body;
+      const token = jwt.sign(user, process.env.SECRET_KEY, { expiresIn: '365d' })
+      res.send({ token })
+    })
+    //middlewares:
     //verifyToken
     const verifyToken = (req, res, next) => {
       // console.log('inside token',req.headers.authorization);
@@ -57,28 +55,39 @@ async function run() {
         next()
       })
     }
-     //use verify Admin after verifytoken
-     const verifyAdmin = async (req, res, next) => {
+    //use verify Admin after verifytoken
+    const verifyAdmin = async (req, res, next) => {
       const email = req.decoded.email
       const query = { email: email }
       const user = await usersCollection.findOne(query);
-      const isAdmin = user?.role === 'admin'
+      const isAdmin = user?.role === 'Admin'
       if (!isAdmin) {
         return res.status(403).send({ message: 'forbidden access' })
       }
       next()
     }
-  //get users data based on email from db
-
-  app.get('/users/:email', verifyToken, async (req, res) => {
-    const email = req.params.email;
-    if (email !== req.decoded.email) {
-      return res.status(403).send({ message: 'forbidden access' });
+    //use verify Moderator after verifytoken
+    const verifyModerator = async (req, res, next) => {
+      const email = req.decoded.email
+      const query = { email: email }
+      const user = await usersCollection.findOne(query);
+      const isModerator = user?.role === 'Moderator'
+      if (!isModerator) {
+        return res.status(403).send({ message: 'forbidden access' })
+      }
+      next()
     }
-    const query = { email };
-    const user = await usersCollection.findOne(query);
-    res.send(user);
-  });
+    //get users data based on email from db
+
+    app.get('/users/:email', verifyToken, async (req, res) => {
+      const email = req.params.email;
+      if (email !== req.decoded.email) {
+        return res.status(403).send({ message: 'forbidden access' });
+      }
+      const query = { email };
+      const user = await usersCollection.findOne(query);
+      res.send(user);
+    });
     // get user role
     app.get('/users/role/:email', async (req, res) => {
       const email = req.params.email
@@ -86,18 +95,18 @@ async function run() {
 
       res.send({ role: result?.role })
     })
-      // get all user data
-      app.get('/all-users/:email', verifyToken,  async (req, res) => {
-        const email = req.params.email
-        const query = { email: { $ne: email } } //admin email bade
-        const result = await usersCollection.find(query).toArray()
-        res.send(result)
-      })
-       // update a user role & status
+    // get all user data
+    app.get('/all-users/:email', verifyToken,verifyAdmin, async (req, res) => {
+      const email = req.params.email
+      const query = { email: { $ne: email } } 
+      const result = await usersCollection.find(query).toArray()
+      res.send(result)
+    })
+    // update a user role & status
     app.patch(
       '/user/role/:email',
       verifyToken,
-
+      verifyAdmin,
       async (req, res) => {
         const email = req.params.email
         const { role } = req.body
@@ -121,106 +130,165 @@ async function run() {
       const result = await usersCollection.insertOne(user);
       res.send(result);
     });
- //post product data in db
+    //post product data in db
 
- app.post('/product', verifyToken,  async (req, res) => {
-  const product = req.body;
-  const result = await productsCollection.insertOne({...product, timestamp: Date.now()} );
-  res.send(result);
-});
-// get all products for a specific user
-app.get('/products/:email', verifyToken, async (req, res) => {
-  const email = req.params.email
-  const query = { 'ownerEmail': email }
-  const result = await productsCollection.find(query).toArray()
+    app.post('/product', verifyToken, async (req, res) => {
+      const product = req.body;
+      const result = await productsCollection.insertOne({ ...product, timestamp: Date.now() });
+      res.send(result);
+    });
+    // get all products for a specific user
+    app.get('/products/:email', verifyToken, async (req, res) => {
+      const email = req.params.email
+      const query = { 'ownerEmail': email }
+      const result = await productsCollection.find(query).toArray()
 
-  res.send(result)
-})
-//update product data from db
-app.get('/product/:id', async (req, res) => {
-  const id = req.params.id;
-
-  const query = { _id: new ObjectId(id) }
-  const result = await productsCollection.findOne(query);
-
-
-  res.send(result);
-})
-app.patch('/product/:id', async (req, res) => {
-  const product = req.body;
-  const id = req.params.id;
-
-  const filter = { _id: new ObjectId(id) }
-  const updatedDoc = {
-    $set: {
-      productName: product.productName,
-      description: product.description,
-      link: product.link,
-      tags: product.tags,
-
-
-    }
-  }
-  const result = await productsCollection.updateOne(filter, updatedDoc);
-
-  res.send(result);
-})
- // delete a product
- app.delete('/products/:id', verifyToken, async (req, res) => {
-  const id = req.params.id
-  const query = { _id: new ObjectId(id) }
-
-  const result = await productsCollection.deleteOne(query)
-  res.send(result)
-})
-//payment
-app.post("/create-payment-intent", async (req, res) => {
-  try {
-    const { amount,email } = req.body;
-
-
-    const paymentIntent = await stripe.paymentIntents.create({
-      amount: amount * 100, // Convert to cents
-      currency: "usd",
+      res.send(result)
+    })
+    // get all products 
+    app.get('/products', verifyToken,verifyModerator, async (req, res) => {
+      const result = await productsCollection.aggregate([
+          {
+              $addFields: {
+                  statusOrder: {
+                      $switch: {
+                          branches: [
+                              { case: { $eq: ["$status", "pending"] }, then: 1 },
+                              { case: { $eq: ["$status", "accepted"] }, then: 2 },
+                              { case: { $eq: ["$status", "rejected"] }, then: 3 }
+                          ],
+                          default: 4
+                      }
+                  }
+              }
+          },
+          {
+              $sort: {
+                  statusOrder: 1,
+                  timestamp: -1  
+              }
+          },
+          { $project: { statusOrder: 0 } }
+      ]).toArray();
       
-      "payment_method_types": [
-        "card"
-      ],
+      res.send(result);
+  });
+    // Update product status
+    app.post('/updateProductStatus',verifyToken,verifyModerator, async (req, res) => {
+      const { id, isRejected, isAccepted, isFeatured, status } = req.body;
+  
+      try {
+          const filter = { _id: new ObjectId(id) };
+          const update = {};
+  
+          if (typeof isRejected !== 'undefined') update.isRejected = isRejected;
+          if (typeof isAccepted !== 'undefined') update.isAccepted = isAccepted;
+  
+          if (typeof isFeatured !== 'undefined') update.isFeatured = isFeatured;
+  
+          if (status) update.status = status;
+  
+        
+          const result = await productsCollection.updateOne(filter, { $set: update });
+  
+          if (result.modifiedCount > 0) {
+              res.status(200).send({ message: 'Status updated successfully' });
+          } else {
+              res.status(400).send({ message: 'Failed to update status' });
+          }
+      } catch (error) {
+          console.error('Error updating status:', error);
+          res.status(500).send({ message: 'Internal server error' });
+      }
+  });
+  
+  
+  
+    //update product data from db
+    app.get('/product/:id',verifyToken, async (req, res) => {
+      const id = req.params.id;
+
+      const query = { _id: new ObjectId(id) }
+      const result = await productsCollection.findOne(query);
+
+
+      res.send(result);
+    })
+    app.patch('/product/:id', async (req, res) => {
+      const product = req.body;
+      const id = req.params.id;
+
+      const filter = { _id: new ObjectId(id) }
+      const updatedDoc = {
+        $set: {
+          productName: product.productName,
+          description: product.description,
+          link: product.link,
+          tags: product.tags,
+
+
+        }
+      }
+      const result = await productsCollection.updateOne(filter, updatedDoc);
+
+      res.send(result);
+    })
+    // delete a product
+    app.delete('/products/:id', verifyToken, async (req, res) => {
+      const id = req.params.id
+      const query = { _id: new ObjectId(id) }
+
+      const result = await productsCollection.deleteOne(query)
+      res.send(result)
+    })
+    //payment
+    app.post("/create-payment-intent",verifyToken, async (req, res) => {
+      try {
+        const { amount, email } = req.body;
+
+
+        const paymentIntent = await stripe.paymentIntents.create({
+          amount: amount * 100, // Convert to cents
+          currency: "usd",
+
+          "payment_method_types": [
+            "card"
+          ],
+        });
+
+        res.send({ clientSecret: paymentIntent.client_secret });
+
+      } catch (error) {
+        res.status(500).send({ error: error.message });
+      }
+    });
+    // Update Subscription After Payment Success
+    app.post("/update-subscription",verifyToken, async (req, res) => {
+      try {
+        const { email } = req.body;
+
+        if (!email) {
+          return res.status(400).send({ error: "Email is required" });
+        }
+
+        // Update user's subscription status in the database
+        const result = await usersCollection.updateOne(
+          { email: email },
+          { $set: { isSubscribed: true } }
+        );
+
+        if (result.modifiedCount > 0) {
+          res.send({ success: true, message: "Subscription updated successfully" });
+        } else {
+          res.status(404).send({ error: "User not found" });
+        }
+      } catch (error) {
+        res.status(500).send({ error: error.message });
+      }
     });
 
-    res.send({ clientSecret: paymentIntent.client_secret });
-
-  } catch (error) {
-    res.status(500).send({ error: error.message });
-  }
-});
-// Update Subscription After Payment Success
-app.post("/update-subscription", async (req, res) => {
-  try {
-    const { email } = req.body;
-
-    if (!email) {
-      return res.status(400).send({ error: "Email is required" });
-    }
-
-    // Update user's subscription status in the database
-    const result = await usersCollection.updateOne(
-      { email: email },
-      { $set: { isSubscribed: true } }
-    );
-
-    if (result.modifiedCount > 0) {
-      res.send({ success: true, message: "Subscription updated successfully" });
-    } else {
-      res.status(404).send({ error: "User not found" });
-    }
-  } catch (error) {
-    res.status(500).send({ error: error.message });
-  }
-});
-
     // Send a ping to confirm a successful connection
-    await client.db('admin').command({ ping: 1 })
+    // await client.db('admin').command({ ping: 1 })
     console.log(
       'Pinged your deployment. You successfully connected to MongoDB!'
     )
