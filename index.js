@@ -288,15 +288,49 @@ async function run() {
     });
 //get featured data from db
 app.get('/featurdProducts', async (req, res) => {
-  const result = await productsCollection.find({ isFeatured: true })  .sort({ timestamp: -1 }).limit(4).toArray();
+  const result = await productsCollection.find({ isFeatured: true }&&{ isAccepted: true }).sort({ timestamp: -1 }).limit(4).toArray();
   res.send(result);
 })
 //get trendingProducts data from db
 app.get('/trendingProducts', async (req, res) => {
-  const result = await productsCollection.find({ isFeatured: true })  .sort({ 
-    upvoteCount: -1 }).limit(6).toArray();
+  const result = await productsCollection.find({ isAccepted: true }) .sort({ upvoteCount: -1 }).limit(6).toArray();
   res.send(result);
 })
+//get all accepted products data from db
+app.get('/acceptedProducts', async (req, res) => {
+  const { tag, page = 1, limit = 6 } = req.query;
+  const filter = { isAccepted: true };
+  
+  if (tag) {
+    filter.tags = tag;
+  }
+
+  try {
+    // Calculate skip value for pagination
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    
+    // Get total count for pagination
+    const totalCount = await productsCollection.countDocuments(filter);
+    
+    // Get paginated results
+    const result = await productsCollection
+      .find(filter)
+      .sort({ timestamp: -1 })
+      .skip(skip)
+      .limit(parseInt(limit))
+      .toArray();
+      
+    res.send({
+      products: result,
+      totalProducts: totalCount,
+      currentPage: parseInt(page),
+      totalPages: Math.ceil(totalCount / parseInt(limit))
+    });
+  } catch (error) {
+    res.status(500).send({ message: error.message });
+  }
+});
+
     // Send a ping to confirm a successful connection
     // await client.db('admin').command({ ping: 1 })
     console.log(
