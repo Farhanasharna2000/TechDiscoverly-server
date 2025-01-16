@@ -288,7 +288,13 @@ async function run() {
     });
 //get featured data from db
 app.get('/featurdProducts', async (req, res) => {
-  const result = await productsCollection.find({ isFeatured: true }).toArray();
+  const result = await productsCollection.find({ isFeatured: true })  .sort({ timestamp: -1 }).limit(4).toArray();
+  res.send(result);
+})
+//get trendingProducts data from db
+app.get('/trendingProducts', async (req, res) => {
+  const result = await productsCollection.find({ isFeatured: true })  .sort({ 
+    upvoteCount: -1 }).limit(6).toArray();
   res.send(result);
 })
     // Send a ping to confirm a successful connection
