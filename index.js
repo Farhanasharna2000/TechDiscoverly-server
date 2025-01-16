@@ -286,7 +286,11 @@ async function run() {
         res.status(500).send({ error: error.message });
       }
     });
-
+//get featured data from db
+app.get('/featurdProducts', async (req, res) => {
+  const result = await productsCollection.find({ isFeatured: true }).toArray();
+  res.send(result);
+})
     // Send a ping to confirm a successful connection
     // await client.db('admin').command({ ping: 1 })
     console.log(
