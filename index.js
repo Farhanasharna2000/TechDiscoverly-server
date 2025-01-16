@@ -96,9 +96,9 @@ async function run() {
       res.send({ role: result?.role })
     })
     // get all user data
-    app.get('/all-users/:email', verifyToken,verifyAdmin, async (req, res) => {
+    app.get('/all-users/:email', verifyToken, verifyAdmin, async (req, res) => {
       const email = req.params.email
-      const query = { email: { $ne: email } } 
+      const query = { email: { $ne: email } }
       const result = await usersCollection.find(query).toArray()
       res.send(result)
     })
@@ -130,13 +130,29 @@ async function run() {
       const result = await usersCollection.insertOne(user);
       res.send(result);
     });
+    
     //post product data in db
 
     app.post('/product', verifyToken, async (req, res) => {
+      const { ownerEmail } = req.body;
+      const user = await usersCollection.findOne({ email: ownerEmail }); // Assuming you have a `usersCollection`
+      const isSubscribed = user?.isSubscribed;
+    
+      if (!isSubscribed) {
+        const productCount = await productsCollection.countDocuments({ ownerEmail });
+        if (productCount >= 1) {
+          return res.send({
+            success: false,
+            message: "Non-subscribed users can only add one product.",
+          });
+        }
+      }
+    
       const product = req.body;
       const result = await productsCollection.insertOne({ ...product, timestamp: Date.now() });
-      res.send(result);
+      res.send({ success: true, result });
     });
+    
     // get all products for a specific user
     app.get('/products/:email', verifyToken, async (req, res) => {
       const email = req.params.email
@@ -146,66 +162,66 @@ async function run() {
       res.send(result)
     })
     // get all products 
-    app.get('/products', verifyToken,verifyModerator, async (req, res) => {
+    app.get('/products', verifyToken, verifyModerator, async (req, res) => {
       const result = await productsCollection.aggregate([
-          {
-              $addFields: {
-                  statusOrder: {
-                      $switch: {
-                          branches: [
-                              { case: { $eq: ["$status", "pending"] }, then: 1 },
-                              { case: { $eq: ["$status", "accepted"] }, then: 2 },
-                              { case: { $eq: ["$status", "rejected"] }, then: 3 }
-                          ],
-                          default: 4
-                      }
-                  }
+        {
+          $addFields: {
+            statusOrder: {
+              $switch: {
+                branches: [
+                  { case: { $eq: ["$status", "pending"] }, then: 1 },
+                  { case: { $eq: ["$status", "accepted"] }, then: 2 },
+                  { case: { $eq: ["$status", "rejected"] }, then: 3 }
+                ],
+                default: 4
               }
-          },
-          {
-              $sort: {
-                  statusOrder: 1,
-                  timestamp: -1  
-              }
-          },
-          { $project: { statusOrder: 0 } }
-      ]).toArray();
-      
-      res.send(result);
-  });
-    // Update product status
-    app.post('/updateProductStatus',verifyToken,verifyModerator, async (req, res) => {
-      const { id, isRejected, isAccepted, isFeatured, status } = req.body;
-  
-      try {
-          const filter = { _id: new ObjectId(id) };
-          const update = {};
-  
-          if (typeof isRejected !== 'undefined') update.isRejected = isRejected;
-          if (typeof isAccepted !== 'undefined') update.isAccepted = isAccepted;
-  
-          if (typeof isFeatured !== 'undefined') update.isFeatured = isFeatured;
-  
-          if (status) update.status = status;
-  
-        
-          const result = await productsCollection.updateOne(filter, { $set: update });
-  
-          if (result.modifiedCount > 0) {
-              res.status(200).send({ message: 'Status updated successfully' });
-          } else {
-              res.status(400).send({ message: 'Failed to update status' });
+            }
           }
+        },
+        {
+          $sort: {
+            statusOrder: 1,
+            timestamp: -1
+          }
+        },
+        { $project: { statusOrder: 0 } }
+      ]).toArray();
+
+      res.send(result);
+    });
+    // Update product status
+    app.post('/updateProductStatus', verifyToken, verifyModerator, async (req, res) => {
+      const { id, isRejected, isAccepted, isFeatured, status } = req.body;
+
+      try {
+        const filter = { _id: new ObjectId(id) };
+        const update = {};
+
+        if (typeof isRejected !== 'undefined') update.isRejected = isRejected;
+        if (typeof isAccepted !== 'undefined') update.isAccepted = isAccepted;
+
+        if (typeof isFeatured !== 'undefined') update.isFeatured = isFeatured;
+
+        if (status) update.status = status;
+
+
+        const result = await productsCollection.updateOne(filter, { $set: update });
+
+        if (result.modifiedCount > 0) {
+          res.status(200).send({ message: 'Status updated successfully' });
+        } else {
+          res.status(400).send({ message: 'Failed to update status' });
+        }
       } catch (error) {
-          console.error('Error updating status:', error);
-          res.status(500).send({ message: 'Internal server error' });
+        console.error('Error updating status:', error);
+        res.status(500).send({ message: 'Internal server error' });
       }
-  });
-  
-  
-  
+    });
+
+
+
     //update product data from db
-    app.get('/product/:id',verifyToken, async (req, res) => {
+    app.get('/product/:id', verifyToken, async (req, res) => {
       const id = req.params.id;
 
       const query = { _id: new ObjectId(id) }
@@ -242,7 +258,7 @@ async function run() {
       res.send(result)
     })
     //payment
-    app.post("/create-payment-intent",verifyToken, async (req, res) => {
+    app.post("/create-payment-intent", verifyToken, async (req, res) => {
       try {
         const { amount, email } = req.body;
 
@@ -263,7 +279,7 @@ async function run() {
       }
     });
     // Update Subscription After Payment Success
-    app.post("/update-subscription",verifyToken, async (req, res) => {
+    app.post("/update-subscription", verifyToken, async (req, res) => {
       try {
         const { email } = req.body;
 
@@ -286,85 +302,85 @@ async function run() {
         res.status(500).send({ error: error.message });
       }
     });
-//get featured data from db
-app.get('/featurdProducts', async (req, res) => {
-  const result = await productsCollection.find({ isFeatured: true, isAccepted: true }).sort({ timestamp: -1 }).limit(4).toArray();
-  res.send(result);
-})
-//upvote functionality
-app.post('/upvote/:productId', async (req, res) => {
-  const { productId } = req.params;
-  const { email } = req.body;
+    //get featured data from db
+    app.get('/featurdProducts', async (req, res) => {
+      const result = await productsCollection.find({ isFeatured: true, isAccepted: true }).sort({ timestamp: -1 }).limit(4).toArray();
+      res.send(result);
+    })
+    //upvote functionality
+    app.post('/upvote/:productId', async (req, res) => {
+      const { productId } = req.params;
+      const { email } = req.body;
 
-  try {
-    const product = await productsCollection.findOne({ _id: new ObjectId(productId) });
+      try {
+        const product = await productsCollection.findOne({ _id: new ObjectId(productId) });
 
-   
-    if (product.voteUser && product.voteUser.includes(email)) {
-      return res.status(400).json({ message: 'You have already upvoted this product' });
-    }
 
-    const result = await productsCollection.updateOne(
-      { _id: new ObjectId(productId) },
-      {
-        $inc: { upvoteCount: 1 },
-        $push: { voteUser: email }
+        if (product.voteUser && product.voteUser.includes(email)) {
+          return res.status(400).json({ message: 'You have already upvoted this product' });
+        }
+
+        const result = await productsCollection.updateOne(
+          { _id: new ObjectId(productId) },
+          {
+            $inc: { upvoteCount: 1 },
+            $push: { voteUser: email }
+          }
+        );
+
+        if (result.modifiedCount > 0) {
+          res.status(200).json({ message: 'Upvote successful' });
+        } else {
+          res.status(500).json({ message: 'Failed to upvote' });
+        }
+      } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Server error' });
       }
-    );
-
-    if (result.modifiedCount > 0) {
-      res.status(200).json({ message: 'Upvote successful' });
-    } else {
-      res.status(500).json({ message: 'Failed to upvote' });
-    }
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Server error' });
-  }
-});
-
-
-
-
-//get trendingProducts data from db
-app.get('/trendingProducts', async (req, res) => {
-  const result = await productsCollection.find({ isAccepted: true }) .sort({ upvoteCount: -1 }).limit(6).toArray();
-  res.send(result);
-})
-//get all accepted products data from db
-app.get('/acceptedProducts', async (req, res) => {
-  const { tag, page = 1, limit = 6 } = req.query;
-  const filter = { isAccepted: true };
-  
-  if (tag) {
-    filter.tags = tag;
-  }
-
-  try {
-    // Calculate skip value for pagination
-    const skip = (parseInt(page) - 1) * parseInt(limit);
-    
-    // Get total count for pagination
-    const totalCount = await productsCollection.countDocuments(filter);
-    
-    // Get paginated results
-    const result = await productsCollection
-      .find(filter)
-      .sort({ timestamp: -1 })
-      .skip(skip)
-      .limit(parseInt(limit))
-      .toArray();
-      
-    res.send({
-      products: result,
-      totalProducts: totalCount,
-      currentPage: parseInt(page),
-      totalPages: Math.ceil(totalCount / parseInt(limit))
     });
-  } catch (error) {
-    res.status(500).send({ message: error.message });
-  }
-});
+
+
+
+
+    //get trendingProducts data from db
+    app.get('/trendingProducts', async (req, res) => {
+      const result = await productsCollection.find({ isAccepted: true }).sort({ upvoteCount: -1 }).limit(6).toArray();
+      res.send(result);
+    })
+    //get all accepted products data from db
+    app.get('/acceptedProducts', async (req, res) => {
+      const { tag, page = 1, limit = 6 } = req.query;
+      const filter = { isAccepted: true };
+
+      if (tag) {
+        filter.tags = tag;
+      }
+
+      try {
+        // Calculate skip value for pagination
+        const skip = (parseInt(page) - 1) * parseInt(limit);
+
+        // Get total count for pagination
+        const totalCount = await productsCollection.countDocuments(filter);
+
+        // Get paginated results
+        const result = await productsCollection
+          .find(filter)
+          .sort({ timestamp: -1 })
+          .skip(skip)
+          .limit(parseInt(limit))
+          .toArray();
+
+        res.send({
+          products: result,
+          totalProducts: totalCount,
+          currentPage: parseInt(page),
+          totalPages: Math.ceil(totalCount / parseInt(limit))
+        });
+      } catch (error) {
+        res.status(500).send({ message: error.message });
+      }
+    });
 
     // Send a ping to confirm a successful connection
     // await client.db('admin').command({ ping: 1 })
