@@ -288,9 +288,44 @@ async function run() {
     });
 //get featured data from db
 app.get('/featurdProducts', async (req, res) => {
-  const result = await productsCollection.find({ isFeatured: true }&&{ isAccepted: true }).sort({ timestamp: -1 }).limit(4).toArray();
+  const result = await productsCollection.find({ isFeatured: true, isAccepted: true }).sort({ timestamp: -1 }).limit(4).toArray();
   res.send(result);
 })
+//upvote functionality
+app.post('/upvote/:productId', async (req, res) => {
+  const { productId } = req.params;
+  const { email } = req.body;
+
+  try {
+    const product = await productsCollection.findOne({ _id: new ObjectId(productId) });
+
+   
+    if (product.voteUser && product.voteUser.includes(email)) {
+      return res.status(400).json({ message: 'You have already upvoted this product' });
+    }
+
+    const result = await productsCollection.updateOne(
+      { _id: new ObjectId(productId) },
+      {
+        $inc: { upvoteCount: 1 },
+        $push: { voteUser: email }
+      }
+    );
+
+    if (result.modifiedCount > 0) {
+      res.status(200).json({ message: 'Upvote successful' });
+    } else {
+      res.status(500).json({ message: 'Failed to upvote' });
+    }
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+
+
+
 //get trendingProducts data from db
 app.get('/trendingProducts', async (req, res) => {
   const result = await productsCollection.find({ isAccepted: true }) .sort({ upvoteCount: -1 }).limit(6).toArray();
