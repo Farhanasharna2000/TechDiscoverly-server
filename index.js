@@ -29,6 +29,10 @@ async function run() {
   try {
     const usersCollection = client.db('TechDiscoverly').collection('users')
     const productsCollection = client.db('TechDiscoverly').collection('products')
+    const reviewsCollection = client.db('TechDiscoverly').collection('reviews')
+    const reportsCollection = client.db('TechDiscoverly').collection('reports')
+
+
 
 
     //jwt related apis
@@ -130,14 +134,14 @@ async function run() {
       const result = await usersCollection.insertOne(user);
       res.send(result);
     });
-    
+
     //post product data in db
 
     app.post('/product', verifyToken, async (req, res) => {
       const { ownerEmail } = req.body;
-      const user = await usersCollection.findOne({ email: ownerEmail }); // Assuming you have a `usersCollection`
+      const user = await usersCollection.findOne({ email: ownerEmail });
       const isSubscribed = user?.isSubscribed;
-    
+
       if (!isSubscribed) {
         const productCount = await productsCollection.countDocuments({ ownerEmail });
         if (productCount >= 1) {
@@ -147,12 +151,12 @@ async function run() {
           });
         }
       }
-    
+
       const product = req.body;
       const result = await productsCollection.insertOne({ ...product, timestamp: Date.now() });
       res.send({ success: true, result });
     });
-    
+
     // get all products for a specific user
     app.get('/products/:email', verifyToken, async (req, res) => {
       const email = req.params.email
@@ -189,6 +193,13 @@ async function run() {
 
       res.send(result);
     });
+    // get a product by id
+    app.get('/product/:id', async (req, res) => {
+      const id = req.params.id
+      const query = { _id: new ObjectId(id) }
+      const result = await productsCollection.findOne(query)
+      res.send(result)
+    })
     // Update product status
     app.post('/updateProductStatus', verifyToken, verifyModerator, async (req, res) => {
       const { id, isRejected, isAccepted, isFeatured, status } = req.body;
@@ -339,9 +350,6 @@ async function run() {
       }
     });
 
-
-
-
     //get trendingProducts data from db
     app.get('/trendingProducts', async (req, res) => {
       const result = await productsCollection.find({ isAccepted: true }).sort({ upvoteCount: -1 }).limit(6).toArray();
@@ -382,6 +390,32 @@ async function run() {
       }
     });
 
+    //post reviews collection in db
+
+    app.post('/reviews', async (req, res) => {
+      const reviews = req.body;
+
+      const result = await reviewsCollection.insertOne(reviews);
+      res.send(result);
+    });
+
+    //get reviews data from db
+    app.get('/reviews/:id', verifyToken, async (req, res) => {
+      const id = req.params.id;
+      const query = { productId: id };
+      const result = await reviewsCollection.find(query).toArray();
+
+      res.send(result);
+    });
+
+    //post reports collection in db
+
+    app.post('/reports', async (req, res) => {
+      const reports = req.body;
+
+      const result = await reportsCollection.insertOne(reports);
+      res.send(result);
+    });
     // Send a ping to confirm a successful connection
     // await client.db('admin').command({ ping: 1 })
     console.log(
