@@ -31,8 +31,7 @@ async function run() {
     const productsCollection = client.db('TechDiscoverly').collection('products')
     const reviewsCollection = client.db('TechDiscoverly').collection('reviews')
     const reportsCollection = client.db('TechDiscoverly').collection('reports')
-
-
+    const couponsCollection = client.db('TechDiscoverly').collection('coupons')
 
 
     //jwt related apis
@@ -41,10 +40,11 @@ async function run() {
       const token = jwt.sign(user, process.env.SECRET_KEY, { expiresIn: '365d' })
       res.send({ token })
     })
+
     //middlewares:
     //verifyToken
     const verifyToken = (req, res, next) => {
-      // console.log('inside token',req.headers.authorization);
+      
       if (!req.headers.authorization) {
         return res.status(401).send({ message: 'unauthorized access' })
       }
@@ -59,6 +59,7 @@ async function run() {
         next()
       })
     }
+
     //use verify Admin after verifytoken
     const verifyAdmin = async (req, res, next) => {
       const email = req.decoded.email
@@ -70,6 +71,7 @@ async function run() {
       }
       next()
     }
+
     //use verify Moderator after verifytoken
     const verifyModerator = async (req, res, next) => {
       const email = req.decoded.email
@@ -81,8 +83,8 @@ async function run() {
       }
       next()
     }
-    //get users data based on email from db
 
+    //get users data based on email from db
     app.get('/users/:email', verifyToken, async (req, res) => {
       const email = req.params.email;
       if (email !== req.decoded.email) {
@@ -92,6 +94,7 @@ async function run() {
       const user = await usersCollection.findOne(query);
       res.send(user);
     });
+
     // get user role
     app.get('/users/role/:email', async (req, res) => {
       const email = req.params.email
@@ -99,6 +102,7 @@ async function run() {
 
       res.send({ role: result?.role })
     })
+
     // get all user data
     app.get('/all-users/:email', verifyToken, verifyAdmin, async (req, res) => {
       const email = req.params.email
@@ -106,6 +110,7 @@ async function run() {
       const result = await usersCollection.find(query).toArray()
       res.send(result)
     })
+
     // update a user role & status
     app.patch(
       '/user/role/:email',
@@ -122,6 +127,7 @@ async function run() {
         res.send(result)
       }
     )
+
     //post users collection in db
 
     app.post('/users', async (req, res) => {
@@ -165,6 +171,7 @@ async function run() {
 
       res.send(result)
     })
+
     // get all products 
     app.get('/products', verifyToken, verifyModerator, async (req, res) => {
       const result = await productsCollection.aggregate([
@@ -193,6 +200,7 @@ async function run() {
 
       res.send(result);
     });
+
     // get a product by id
     app.get('/product/:id', async (req, res) => {
       const id = req.params.id
@@ -200,11 +208,12 @@ async function run() {
       const result = await productsCollection.findOne(query)
       res.send(result)
     })
+
     // Update product status
     app.post('/updateProductStatus', verifyToken, verifyModerator, async (req, res) => {
       const { id, isRejected, isAccepted, isFeatured, status } = req.body;
 
-      try {
+    
         const filter = { _id: new ObjectId(id) };
         const update = {};
 
@@ -218,15 +227,8 @@ async function run() {
 
         const result = await productsCollection.updateOne(filter, { $set: update });
 
-        if (result.modifiedCount > 0) {
-          res.status(200).send({ message: 'Status updated successfully' });
-        } else {
-          res.status(400).send({ message: 'Failed to update status' });
-        }
-      } catch (error) {
-        console.error('Error updating status:', error);
-        res.status(500).send({ message: 'Internal server error' });
-      }
+        res.send(result)
+   
     });
 
     //update product data from db
@@ -258,6 +260,7 @@ async function run() {
 
       res.send(result);
     })
+
     // delete a product
     app.delete('/products/:id', verifyToken, async (req, res) => {
       const id = req.params.id
@@ -266,9 +269,10 @@ async function run() {
       const result = await productsCollection.deleteOne(query)
       res.send(result)
     })
+
     //payment
     app.post("/create-payment-intent", verifyToken, async (req, res) => {
-      try {
+      
         const { amount, email } = req.body;
 
 
@@ -283,34 +287,22 @@ async function run() {
 
         res.send({ clientSecret: paymentIntent.client_secret });
 
-      } catch (error) {
-        res.status(500).send({ error: error.message });
-      }
+     
     });
+
     // Update Subscription After Payment Success
     app.post("/update-subscription", verifyToken, async (req, res) => {
-      try {
+      
         const { email } = req.body;
 
-        if (!email) {
-          return res.status(400).send({ error: "Email is required" });
-        }
-
-        // Update user's subscription status in the database
         const result = await usersCollection.updateOne(
           { email: email },
           { $set: { isSubscribed: true } }
         );
 
-        if (result.modifiedCount > 0) {
-          res.send({ success: true, message: "Subscription updated successfully" });
-        } else {
-          res.status(404).send({ error: "User not found" });
-        }
-      } catch (error) {
-        res.status(500).send({ error: error.message });
-      }
+        res.send(result)
     });
+
     //get featured data from db
     app.get('/featurdProducts', async (req, res) => {
       const result = await productsCollection.find({ isFeatured: true, isAccepted: true }).sort({ timestamp: -1 }).limit(4).toArray();
@@ -320,8 +312,7 @@ async function run() {
     app.post('/upvote/:productId', async (req, res) => {
       const { productId } = req.params;
       const { email } = req.body;
-
-      try {
+ 
         const product = await productsCollection.findOne({ _id: new ObjectId(productId) });
 
 
@@ -337,15 +328,7 @@ async function run() {
           }
         );
 
-        if (result.modifiedCount > 0) {
-          res.status(200).json({ message: 'Upvote successful' });
-        } else {
-          res.status(500).json({ message: 'Failed to upvote' });
-        }
-      } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Server error' });
-      }
+        res.send(result)
     });
 
     //get trendingProducts data from db
@@ -353,6 +336,7 @@ async function run() {
       const result = await productsCollection.find({ isAccepted: true }).sort({ upvoteCount: -1 }).limit(6).toArray();
       res.send(result);
     })
+
     //get all accepted products data from db
     app.get('/acceptedProducts', async (req, res) => {
       const { tag, page = 1, limit = 6 } = req.query;
@@ -362,14 +346,12 @@ async function run() {
         filter.tags = tag;
       }
 
-      try {
-        // Calculate skip value for pagination
+   
         const skip = (parseInt(page) - 1) * parseInt(limit);
 
-        // Get total count for pagination
+       
         const totalCount = await productsCollection.countDocuments(filter);
-
-        // Get paginated results
+        
         const result = await productsCollection
           .find(filter)
           .sort({ timestamp: -1 })
@@ -383,9 +365,7 @@ async function run() {
           currentPage: parseInt(page),
           totalPages: Math.ceil(totalCount / parseInt(limit))
         });
-      } catch (error) {
-        res.status(500).send({ message: error.message });
-      }
+      
     });
 
     //post reviews collection in db
@@ -424,7 +404,6 @@ async function run() {
     app.get('/reports', verifyToken, verifyModerator, async (req, res) => {
 
       const result = await reportsCollection.find().toArray();
-      console.log(result);
 
       res.send(result);
     });
@@ -440,7 +419,7 @@ async function run() {
 
     //stat
     app.get('/stats', verifyToken, verifyAdmin, async (req, res) => {
-      try {
+     
         const users = await usersCollection.estimatedDocumentCount();
         const reviews = await reviewsCollection.estimatedDocumentCount();
 
@@ -460,12 +439,60 @@ async function run() {
         const totalProducts = totalProductsResult.length > 0 ? totalProductsResult[0].totalProducts : 0;
 
         res.send({ users, reviews, totalProducts });
-      } catch (error) {
-        console.error(error);
-        res.status(500).send({ error: "Failed to fetch stats" });
-      }
+     
     });
 
+// post coupons
+app.post("/coupons",verifyToken,verifyAdmin, async (req, res) => {
+  const { code, expiry, description, discount } = req.body;
+    const newCoupon = {
+      code,
+      expiry: new Date(expiry), 
+      description,
+      discount: parseFloat(discount), 
+    };
+    const result = await couponsCollection.insertOne(newCoupon);
+    res.send(result)
+});
+
+//  get all coupons
+app.get("/coupons",verifyToken,verifyAdmin, async (req, res) => {
+
+    const result = await couponsCollection.find().toArray();
+    res.send(result)
+ 
+});
+
+//  delete a coupon
+app.delete("/coupons/:id",verifyToken,verifyAdmin, async (req, res) => {
+ 
+    const { id } = req.params;
+    const query = { _id: new ObjectId(id) }
+    const result = await couponsCollection.deleteOne(query);
+   
+    res.send(result)
+   
+});
+
+//  update a coupon
+app.put("/coupons/:id",verifyToken,verifyAdmin, async (req, res) => {
+  const { id } = req.params;
+  const query = { _id: new ObjectId(id) }
+  const { code, expiry, description, discount } = req.body;
+    const updatedCoupon = {
+      code,
+      expiry: new Date(expiry),
+      description,
+      discount: parseFloat(discount),
+    };
+
+    const result = await couponsCollection
+      .updateOne(query , { $set: updatedCoupon });
+
+   
+      res.send(result)
+
+});
 
     // Send a ping to confirm a successful connection
     // await client.db('admin').command({ ping: 1 })
