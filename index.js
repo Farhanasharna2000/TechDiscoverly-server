@@ -416,6 +416,15 @@ async function run() {
       const result = await reportsCollection.insertOne(reports);
       res.send(result);
     });
+
+       //get reports data from db
+       app.get('/reports', verifyToken, async (req, res) => {
+    
+        const result = await reportsCollection.find().toArray();
+        console.log(result);
+  
+        res.send(result);
+      });
     // Send a ping to confirm a successful connection
     // await client.db('admin').command({ ping: 1 })
     console.log(
