@@ -411,9 +411,14 @@ async function run() {
     //post reports collection in db
 
     app.post('/reports', async (req, res) => {
-      const reports = req.body;
-
-      const result = await reportsCollection.insertOne(reports);
+      
+      const { productId, userEmail } = req.body; 
+      const existingReport = await reportsCollection.findOne({ productId, userEmail });
+    
+      if (existingReport) {
+        return res.status(400).send({ message: 'You have already reported this product.' });
+      }
+      const result = await reportsCollection.insertOne(req.body);
       res.send(result);
     });
 
@@ -425,6 +430,15 @@ async function run() {
   
         res.send(result);
       });
+
+      // delete a reported product
+    app.delete('/reports/:id', verifyToken, async (req, res) => {
+      const productId = req.params.id
+      const query = { productId: productId }
+
+      const result = await reportsCollection.deleteOne(query)
+      res.send(result)
+    })
     // Send a ping to confirm a successful connection
     // await client.db('admin').command({ ping: 1 })
     console.log(
