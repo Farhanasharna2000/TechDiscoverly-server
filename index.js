@@ -229,8 +229,6 @@ async function run() {
       }
     });
 
-
-
     //update product data from db
     app.get('/product/:id', verifyToken, async (req, res) => {
       const id = req.params.id;
@@ -241,7 +239,7 @@ async function run() {
 
       res.send(result);
     })
-    app.patch('/product/:id', async (req, res) => {
+    app.patch('/product/:id', verifyToken, async (req, res) => {
       const product = req.body;
       const id = req.params.id;
 
@@ -392,7 +390,7 @@ async function run() {
 
     //post reviews collection in db
 
-    app.post('/reviews', async (req, res) => {
+    app.post('/reviews', verifyToken, async (req, res) => {
       const reviews = req.body;
 
       const result = await reviewsCollection.insertOne(reviews);
@@ -410,11 +408,11 @@ async function run() {
 
     //post reports collection in db
 
-    app.post('/reports', async (req, res) => {
-      
-      const { productId, userEmail } = req.body; 
+    app.post('/reports', verifyToken, verifyModerator, async (req, res) => {
+
+      const { productId, userEmail } = req.body;
       const existingReport = await reportsCollection.findOne({ productId, userEmail });
-    
+
       if (existingReport) {
         return res.status(400).send({ message: 'You have already reported this product.' });
       }
@@ -422,23 +420,53 @@ async function run() {
       res.send(result);
     });
 
-       //get reports data from db
-       app.get('/reports', verifyToken, async (req, res) => {
-    
-        const result = await reportsCollection.find().toArray();
-        console.log(result);
-  
-        res.send(result);
-      });
+    //get reports data from db
+    app.get('/reports', verifyToken, verifyModerator, async (req, res) => {
 
-      // delete a reported product
-    app.delete('/reports/:id', verifyToken, async (req, res) => {
+      const result = await reportsCollection.find().toArray();
+      console.log(result);
+
+      res.send(result);
+    });
+
+    // delete a reported product
+    app.delete('/reports/:id', verifyToken, verifyModerator, async (req, res) => {
       const productId = req.params.id
       const query = { productId: productId }
 
       const result = await reportsCollection.deleteOne(query)
       res.send(result)
     })
+
+    //stat
+    app.get('/stats', verifyToken, verifyAdmin, async (req, res) => {
+      try {
+        const users = await usersCollection.estimatedDocumentCount();
+        const reviews = await reviewsCollection.estimatedDocumentCount();
+
+        // Aggregation for totalProducts
+        const totalProductsResult = await productsCollection.aggregate([
+          {
+            $match: {
+              status: { $in: ["pending", "accepted"] }
+            }
+          },
+          {
+            $count: "totalProducts"
+          }
+        ]).toArray();
+
+
+        const totalProducts = totalProductsResult.length > 0 ? totalProductsResult[0].totalProducts : 0;
+
+        res.send({ users, reviews, totalProducts });
+      } catch (error) {
+        console.error(error);
+        res.status(500).send({ error: "Failed to fetch stats" });
+      }
+    });
+
+
     // Send a ping to confirm a successful connection
     // await client.db('admin').command({ ping: 1 })
     console.log(
