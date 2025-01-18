@@ -181,9 +181,9 @@ async function run() {
             statusOrder: {
               $switch: {
                 branches: [
-                  { case: { $eq: ["$status", "pending"] }, then: 1 },
-                  { case: { $eq: ["$status", "accepted"] }, then: 2 },
-                  { case: { $eq: ["$status", "rejected"] }, then: 3 }
+                  { case: { $eq: ["$status", "Pending"] }, then: 1 },
+                  { case: { $eq: ["$status", "Accepted"] }, then: 2 },
+                  { case: { $eq: ["$status", "Rejected"] }, then: 3 }
                 ],
                 default: 4
               }
@@ -389,7 +389,7 @@ async function run() {
 
     //post reports collection in db
 
-    app.post('/reports', verifyToken, verifyModerator, async (req, res) => {
+    app.post('/reports', verifyToken, async (req, res) => {
 
       const { productId, userEmail } = req.body;
       const existingReport = await reportsCollection.findOne({ productId, userEmail });
@@ -428,7 +428,7 @@ async function run() {
         const totalProductsResult = await productsCollection.aggregate([
           {
             $match: {
-              status: { $in: ["pending", "accepted"] }
+              status: { $in: ["Pending", "Accepted"] }
             }
           },
           {
@@ -474,9 +474,7 @@ app.get("/trendingCoupons", async (req, res) => {
   const result = await couponsCollection
     .find({ expiry: { $gte: todayUTC } }) 
     .toArray();
-
-    console.log(result);
-    
+ 
 
   res.send(result);
 });
