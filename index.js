@@ -4,6 +4,7 @@ const cors = require('cors')
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb')
 const jwt = require('jsonwebtoken')
 const morgan = require('morgan')
+const moment = require('moment')
 const stripe = require('stripe')(process.env.PAYMENT_SECRET_KEY);
 const port = process.env.PORT || 2000
 const app = express()
@@ -456,7 +457,7 @@ app.post("/coupons",verifyToken,verifyAdmin, async (req, res) => {
 });
 
 //  get all coupons
-app.get("/coupons",verifyToken,verifyAdmin, async (req, res) => {
+app.get("/coupons", async (req, res) => {
 
     const result = await couponsCollection.find().toArray();
     res.send(result)
@@ -491,6 +492,32 @@ app.put("/coupons/:id",verifyToken,verifyAdmin, async (req, res) => {
 
    
       res.send(result)
+
+});
+
+// Coupon validation route
+app.post('/validate-coupon', async (req, res) => {
+  const { couponCode } = req.body; 
+
+    const coupon = await couponsCollection.findOne({ code: couponCode });
+
+    if (!coupon) {
+      return res.status(400).send({ message: 'Invalid coupon code' });
+    }
+
+    // Check if the coupon is expired
+    const currentDate = moment();
+    const expiryDate = moment(coupon.expiry);
+
+    if (currentDate.isAfter(expiryDate)) {
+      return res.status(400).send({ message: 'Coupon has expired' });
+    }
+
+    // If valid, return the discount and coupon info
+    return res.status(200).send({
+      discount: coupon.discount,
+      description: coupon.description,
+    });
 
 });
 
