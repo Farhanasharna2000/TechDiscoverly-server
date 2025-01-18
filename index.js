@@ -318,7 +318,7 @@ async function run() {
 
 
         if (product.voteUser && product.voteUser.includes(email)) {
-          return res.status(400).json({ message: 'You have already upvoted this product' });
+          return res.status(400).send({ message: 'You have already upvoted this product' });
         }
 
         const result = await productsCollection.updateOne(
@@ -464,6 +464,24 @@ app.get("/coupons", async (req, res) => {
  
 });
 
+//  get all coupons for trending products
+app.get("/trendingCoupons", async (req, res) => {
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+  const todayUTC = new Date(Date.UTC(today.getFullYear(), today.getMonth(), today.getDate()));
+
+  const result = await couponsCollection
+    .find({ expiry: { $gte: todayUTC } }) 
+    .toArray();
+
+    console.log(result);
+    
+
+  res.send(result);
+});
+
+
 //  delete a coupon
 app.delete("/coupons/:id",verifyToken,verifyAdmin, async (req, res) => {
  
@@ -489,14 +507,12 @@ app.put("/coupons/:id",verifyToken,verifyAdmin, async (req, res) => {
 
     const result = await couponsCollection
       .updateOne(query , { $set: updatedCoupon });
-
-   
       res.send(result)
 
 });
 
-// Coupon validation route
-app.post('/validate-coupon', async (req, res) => {
+// Coupon validation 
+app.post('/validate-coupon',verifyToken, async (req, res) => {
   const { couponCode } = req.body; 
 
     const coupon = await couponsCollection.findOne({ code: couponCode });
