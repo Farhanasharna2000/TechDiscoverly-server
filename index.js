@@ -510,7 +510,7 @@ app.put("/coupons/:id",verifyToken,verifyAdmin, async (req, res) => {
 });
 
 // Coupon validation 
-app.post('/validate-coupon',verifyToken, async (req, res) => {
+app.post('/validate-coupon', async (req, res) => {
   const { couponCode } = req.body; 
 
     const coupon = await couponsCollection.findOne({ code: couponCode });
@@ -534,6 +534,20 @@ app.post('/validate-coupon',verifyToken, async (req, res) => {
     });
 
 });
+
+//update profile
+app.put('/users/:email', async (req, res) => {
+  const { email } = req.params;
+  const updatedData = req.body;
+
+    const result = await usersCollection.updateOne(
+      { email },
+      { $set: updatedData }
+    );
+
+  res.send(result)
+});
+
 
     // Send a ping to confirm a successful connection
     // await client.db('admin').command({ ping: 1 })
