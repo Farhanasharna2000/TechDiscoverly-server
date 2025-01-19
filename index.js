@@ -378,6 +378,7 @@ async function run() {
       res.send(result);
     });
 
+
     //get reviews data from db
     app.get('/reviews/:id', verifyToken, async (req, res) => {
       const id = req.params.id;
@@ -387,6 +388,7 @@ async function run() {
       res.send(result);
     });
 
+    
     //post reports collection in db
 
     app.post('/reports', verifyToken, async (req, res) => {
