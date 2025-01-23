@@ -58,5 +58,5 @@ Follow these steps to set up and run the backend for TechDiscoverly:
 ### 1. Clone the Repository
 Clone the backend repository to your local machine:
 ```bash
-git clone https://github.com/Programming-Hero-Web-Course4/b10a12-server-side-Farhanasharna2000
-cd b10a12-server-side-Farhanasharna2000
+git clone https://github.com/Farhanasharna2000/TechDiscoverly-server
+cd TechDiscoverly-server
