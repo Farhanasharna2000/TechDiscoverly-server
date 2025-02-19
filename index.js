@@ -334,7 +334,7 @@ async function run() {
 
     //get trendingProducts data from db
     app.get('/trendingProducts', async (req, res) => {
-      const result = await productsCollection.find({ isAccepted: true }).sort({ upvoteCount: -1 }).limit(6).toArray();
+      const result = await productsCollection.find({ isAccepted: true }).sort({ upvoteCount: -1 }).limit(8).toArray();
       res.send(result);
     })
 
